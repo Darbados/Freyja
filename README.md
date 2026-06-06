@@ -1,3 +1,9 @@
+The idea of Freja is to give the businesses everything that is needed for a proper human-resourses management.
+As this is a common problem accros coutries with а differet legislation.
+
+The idea is to keep the functionalities and code base as simple as possible, using a set of currently TOP notch of technologies 
+that are praised from an active communiy.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

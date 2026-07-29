@@ -22,7 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-# Backend
-backend/.venv
-backend/app.db
-backend/**/__pycache__/*
+
+# Python cache
+**/__pycache__/*
+Site/**/__pycache__/*
+**/*.pyc
+Site/**/*.pyc
+
+# Project specific
+Site/*.egg-info

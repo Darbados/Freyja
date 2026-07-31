@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+from os import environ
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -27,6 +28,24 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# Django validates the browser's Origin header even when Vite proxies the API
+# request to this server. Keep the local UI origins trusted during development,
+# and provide any deployed UI origins as a comma-separated environment value.
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    *(
+        origin.strip()
+        for origin in environ.get("FREYJA_CSRF_TRUSTED_ORIGINS", "").split(",")
+        if origin.strip()
+    ),
+]
+
+# Avoid collisions with other Django projects running on the localhost host.
+# Cookies are scoped by host and path, not by port.
+SESSION_COOKIE_NAME = "freyja_sessionid"
+CSRF_COOKIE_NAME = "freyja_csrftoken"
+
 
 # Application definition
 
@@ -37,7 +56,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
+    "authentication",
     "departments",
+    "employment",
     "leaves",
     "users",
 ]
@@ -57,7 +79,7 @@ ROOT_URLCONF = "Freyja.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -125,3 +147,16 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 AUTH_USER_MODEL = "users.FreyjaUser"
+LOGIN_REDIRECT_URL = "/admin/"
+LOGOUT_REDIRECT_URL = "/login/"
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}

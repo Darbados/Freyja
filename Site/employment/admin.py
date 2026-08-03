@@ -19,8 +19,8 @@ class EmploymentTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ("user", "manager", "created_at", "updated_at")
-    search_fields = ("user__email", "user__first_name", "user__last_name")
+    list_display = ("user", "job_title", "manager", "created_at", "updated_at")
+    search_fields = ("user__email", "user__first_name", "user__last_name", "job_title")
 
 
 @admin.register(Employment)

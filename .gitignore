@@ -31,3 +31,5 @@ Site/**/*.pyc
 
 # Project specific
 Site/*.egg-info
+__pycache__/
+*.py[cod]

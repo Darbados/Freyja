@@ -19,7 +19,14 @@ class EmploymentTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ("user", "job_title", "manager", "created_at", "updated_at")
+    list_display = (
+        "user",
+        "job_title",
+        "manager",
+        "leave_approver",
+        "created_at",
+        "updated_at",
+    )
     search_fields = ("user__email", "user__first_name", "user__last_name", "job_title")
 
 

@@ -55,9 +55,21 @@ class Employee(TimeStampMixin):
         on_delete=models.SET_NULL,
         related_name="direct_reports",
     )
+    leave_approver = models.ForeignKey(
+        "self",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="leave_approval_assignments",
+    )
 
     def clean(self) -> None:
         super().clean()
+
+        if self.pk and self.leave_approver_id == self.pk:
+            raise ValidationError(
+                {"leave_approver": "An employee cannot approve their own leave."}
+            )
 
         if not self.manager_id:
             return

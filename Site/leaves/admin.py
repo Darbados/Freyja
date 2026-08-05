@@ -13,6 +13,7 @@ class LeaveAdmin(admin.ModelAdmin):
         "leave_type",
         "status",
         "approver",
+        "canceled_at",
     )
     list_filter = ("leave_type", "status")
     search_fields = (
@@ -20,4 +21,5 @@ class LeaveAdmin(admin.ModelAdmin):
         "employee__user__first_name",
         "employee__user__last_name",
         "comment",
+        "cancellation_reason",
     )

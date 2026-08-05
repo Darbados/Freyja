@@ -112,11 +112,84 @@ class LeaveRequestApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()["leave_requests"]), 1)
 
+    def test_cancels_an_owned_active_request_and_emails_the_approver(self) -> None:
+        leave = self._leave(self.employee, self._next_weekday(), approver=self.manager)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("leave_request_cancel", args=(leave.id,)),
+                {"reason": "Plans changed"},
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        leave.refresh_from_db()
+        self.assertEqual(leave.status, Leave.Status.CANCELED)
+        self.assertEqual(leave.cancellation_reason, "Plans changed")
+        self.assertIsNotNone(leave.canceled_at)
+        self.assertFalse(response.json()["can_cancel"])
+        self.assertEqual(mail.outbox[0].to, [self.manager.user.email])
+        self.assertIn("Plans changed", mail.outbox[0].body)
+
+    def test_requires_a_cancellation_reason(self) -> None:
+        leave = self._leave(self.employee, self._next_weekday(), approver=self.manager)
+
+        response = self.client.post(
+            reverse("leave_request_cancel", args=(leave.id,)),
+            {"reason": "   "},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        leave.refresh_from_db()
+        self.assertEqual(leave.status, Leave.Status.PENDING)
+
+    def test_cannot_cancel_another_employees_request(self) -> None:
+        other = self._employee("another@example.com", "Another", "Employee")
+        leave = self._leave(other, self._next_weekday())
+
+        response = self.client.post(
+            reverse("leave_request_cancel", args=(leave.id,)),
+            {"reason": "Not mine"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_cannot_cancel_a_request_after_its_period_ended(self) -> None:
+        day = timezone.localdate() - timedelta(days=1)
+        while day.weekday() >= 5:
+            day -= timedelta(days=1)
+        leave = self._leave(self.employee, day, approver=self.manager)
+
+        response = self.client.post(
+            reverse("leave_request_cancel", args=(leave.id,)),
+            {"reason": "Too late"},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        leave.refresh_from_db()
+        self.assertEqual(leave.status, Leave.Status.PENDING)
+
     def _next_weekday(self):
         day = timezone.localdate() + timedelta(days=1)
         while day.weekday() >= 5:
             day += timedelta(days=1)
         return day
+
+    def _leave(
+        self,
+        employee: Employee,
+        day,
+        approver: Employee | None = None,
+    ) -> Leave:
+        return Leave.objects.create(
+            employee=employee,
+            approver=approver,
+            start_date=day,
+            end_date=day,
+        )
 
     def _employee(
         self,

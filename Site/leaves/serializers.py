@@ -21,6 +21,7 @@ class LeaveSerializer(serializers.ModelSerializer):
     leave_type_label = serializers.CharField(source="get_leave_type_display", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     approver = serializers.SerializerMethodField()
+    can_cancel = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Leave
@@ -37,11 +38,14 @@ class LeaveSerializer(serializers.ModelSerializer):
             "status",
             "status_label",
             "comment",
+            "cancellation_reason",
+            "canceled_at",
+            "can_cancel",
             "approver",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("status",)
+        read_only_fields = ("status", "cancellation_reason", "canceled_at")
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         instance = Leave(**attrs)
@@ -57,3 +61,11 @@ class LeaveSerializer(serializers.ModelSerializer):
         if leave.approver is None:
             return None
         return UserSerializer(leave.approver.user).data
+
+
+class LeaveCancellationSerializer(serializers.Serializer):
+    reason = serializers.CharField(
+        allow_blank=False,
+        max_length=2000,
+        trim_whitespace=True,
+    )

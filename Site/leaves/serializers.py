@@ -69,3 +69,10 @@ class LeaveCancellationSerializer(serializers.Serializer):
         max_length=2000,
         trim_whitespace=True,
     )
+
+
+class AnnualLeaveBalanceSerializer(serializers.Serializer):
+    year = serializers.IntegerField()
+    entitlement_days = serializers.IntegerField()
+    booked_days = serializers.DecimalField(max_digits=7, decimal_places=2)
+    remaining_days = serializers.DecimalField(max_digits=7, decimal_places=2)

@@ -1,11 +1,12 @@
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
 
 from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from employment.models import Employee
+from employment.models import Employee, Employment, EmploymentType, RelationshipKind
 from leaves.models import Leave
 from users.models import FreyjaUser
 
@@ -171,6 +172,97 @@ class LeaveRequestApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         leave.refresh_from_db()
         self.assertEqual(leave.status, Leave.Status.PENDING)
+
+    def test_returns_the_current_annual_leave_balance(self) -> None:
+        year = timezone.localdate().year
+        employment_type = EmploymentType.objects.create(
+            name="Full time",
+            code="full-time",
+            relationship_kind=RelationshipKind.EMPLOYMENT,
+            default_base_leave_days=Decimal("20"),
+        )
+        Employment.objects.create(
+            employee=self.employee,
+            employment_type=employment_type,
+            start_date=date(year, 1, 1),
+        )
+        full_day = self._next_weekday()
+        half_day = full_day + timedelta(days=1)
+        if half_day.weekday() >= 5:
+            half_day += timedelta(days=7 - half_day.weekday())
+        self._leave(self.employee, full_day, approver=self.manager)
+        for _ in range(6):
+            self._leave(self.employee, full_day, approver=self.manager)
+        Leave.objects.create(
+            employee=self.employee,
+            approver=self.manager,
+            start_date=half_day,
+            end_date=half_day,
+            start_day_part=Leave.DayPart.FIRST_HALF,
+            end_day_part=Leave.DayPart.FIRST_HALF,
+            status=Leave.Status.APPROVED,
+        )
+        ignored = self._leave(self.employee, full_day, approver=self.manager)
+        ignored.status = Leave.Status.CANCELED
+        ignored.cancellation_reason = "Canceled"
+        ignored.save()
+
+        response = self.client.get(reverse("leave_requests"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["annual_leave_balance"],
+            {
+                "year": year,
+                "entitlement_days": 20,
+                "booked_days": "7.50",
+                "remaining_days": "12.50",
+            },
+        )
+
+    def test_prorates_the_starting_year_by_month_and_rounds_up(self) -> None:
+        year = timezone.localdate().year
+        employment_type = EmploymentType.objects.create(
+            name="Mid-year full time",
+            code="mid-year-full-time",
+            relationship_kind=RelationshipKind.EMPLOYMENT,
+            default_base_leave_days=Decimal("20"),
+        )
+        Employment.objects.create(
+            employee=self.employee,
+            employment_type=employment_type,
+            start_date=date(year, 8, 1),
+        )
+
+        response = self.client.get(reverse("leave_requests"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["annual_leave_balance"]["entitlement_days"],
+            9,
+        )
+
+    def test_treats_an_override_as_the_final_entitlement_and_rounds_up(self) -> None:
+        year = timezone.localdate().year
+        employment_type = EmploymentType.objects.create(
+            name="Overridden full time",
+            code="overridden-full-time",
+            relationship_kind=RelationshipKind.EMPLOYMENT,
+            default_base_leave_days=Decimal("20"),
+        )
+        Employment.objects.create(
+            employee=self.employee,
+            employment_type=employment_type,
+            start_date=date(year, 8, 1),
+            base_leave_days_override=Decimal("12.25"),
+        )
+
+        response = self.client.get(reverse("leave_requests"))
+
+        self.assertEqual(
+            response.json()["annual_leave_balance"]["entitlement_days"],
+            13,
+        )
 
     def _next_weekday(self):
         day = timezone.localdate() + timedelta(days=1)

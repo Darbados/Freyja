@@ -10,8 +10,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from employment.models import Employee
+from leaves.balance import annual_leave_balance
 from leaves.models import Leave
-from leaves.serializers import LeaveCancellationSerializer, LeaveSerializer
+from leaves.serializers import (
+    AnnualLeaveBalanceSerializer,
+    LeaveCancellationSerializer,
+    LeaveSerializer,
+)
 
 
 class LeaveRequestListCreateApiView(APIView):
@@ -20,7 +25,13 @@ class LeaveRequestListCreateApiView(APIView):
     def get(self, request: Request) -> Response:
         employee = get_object_or_404(Employee, user=request.user)
         leaves = employee.leave_requests.select_related("approver__user")
-        return Response({"leave_requests": LeaveSerializer(leaves, many=True).data})
+        balance = annual_leave_balance(employee, timezone.localdate().year)
+        return Response(
+            {
+                "leave_requests": LeaveSerializer(leaves, many=True).data,
+                "annual_leave_balance": AnnualLeaveBalanceSerializer(balance).data,
+            }
+        )
 
     def post(self, request: Request) -> Response:
         employee = get_object_or_404(

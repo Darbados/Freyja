@@ -5,6 +5,7 @@ from typing import Any
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from Freyja.mixins import TimeStampMixin
 from employment.models import Employee
@@ -63,6 +64,8 @@ class Leave(TimeStampMixin):
         default=Status.PENDING,
     )
     comment = models.TextField(blank=True, default="")
+    cancellation_reason = models.TextField(blank=True, default="")
+    canceled_at = models.DateTimeField(blank=True, null=True)
     reviewed_at = models.DateTimeField(blank=True, null=True)
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -106,6 +109,13 @@ class Leave(TimeStampMixin):
     @property
     def duration_days(self) -> Decimal:
         return self.duration_hours / Decimal("8")
+
+    @property
+    def can_cancel(self) -> bool:
+        return (
+            self.status in {self.Status.PENDING, self.Status.APPROVED}
+            and self.end_date >= timezone.localdate()
+        )
 
     def clean(self) -> None:
         super().clean()

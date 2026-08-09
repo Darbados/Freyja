@@ -76,3 +76,30 @@ class AnnualLeaveBalanceSerializer(serializers.Serializer):
     entitlement_days = serializers.IntegerField()
     booked_days = serializers.DecimalField(max_digits=7, decimal_places=2)
     remaining_days = serializers.DecimalField(max_digits=7, decimal_places=2)
+
+
+class TeamLeaveSerializer(LeaveSerializer):
+    employee = UserSerializer(source="employee.user", read_only=True)
+
+    class Meta(LeaveSerializer.Meta):
+        fields = ("employee",) + LeaveSerializer.Meta.fields
+
+
+class DepartmentLeaveSerializer(serializers.ModelSerializer):
+    employee = UserSerializer(source="employee.user", read_only=True)
+    duration_days = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = Leave
+        fields = (
+            "id",
+            "employee",
+            "start_date",
+            "end_date",
+            "start_day_part",
+            "end_day_part",
+            "duration_days",
+            "leave_type_label",
+        )
+
+    leave_type_label = serializers.CharField(source="get_leave_type_display", read_only=True)

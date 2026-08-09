@@ -1,6 +1,10 @@
+import calendar
+from datetime import date
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -10,12 +14,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from employment.models import Employee
+from departments.models import Department
 from leaves.balance import annual_leave_balance
 from leaves.models import Leave
 from leaves.serializers import (
     AnnualLeaveBalanceSerializer,
+    DepartmentLeaveSerializer,
     LeaveCancellationSerializer,
     LeaveSerializer,
+    TeamLeaveSerializer,
 )
 
 
@@ -130,4 +137,72 @@ class LeaveRequestCancelApiView(APIView):
             ),
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
             recipient_list=[leave.approver.user.email],
+        )
+
+
+class TeamLeaveRequestListApiView(APIView):
+    """Lists leave requests belonging to the signed-in manager's direct reports."""
+
+    def get(self, request: Request) -> Response:
+        manager = get_object_or_404(Employee, user=request.user)
+        is_manager = manager.direct_reports.exists()
+        leaves = (
+            Leave.objects.filter(employee__manager=manager)
+            .select_related("employee__user", "approver__user")
+            .order_by("-start_date", "-created_at")
+            if is_manager
+            else Leave.objects.none()
+        )
+        return Response(
+            {
+                "is_manager": is_manager,
+                "leave_requests": TeamLeaveSerializer(leaves, many=True).data,
+            }
+        )
+
+
+class DepartmentLeaveScheduleApiView(APIView):
+    """Lists approved leave periods for colleagues sharing the employee's departments."""
+
+    def get(self, request: Request) -> Response:
+        get_object_or_404(Employee, user=request.user)
+        department_ids = set(
+            request.user.department_assignments.values_list("department_id", flat=True)
+        )
+        department_ids.update(request.user.departments.values_list("id", flat=True))
+        departments = Department.objects.filter(id__in=department_ids).order_by("name")
+        requested_month = request.query_params.get("month")
+        try:
+            selected_month = (
+                date.fromisoformat(f"{requested_month}-01")
+                if requested_month
+                else timezone.localdate().replace(day=1)
+            )
+        except ValueError as error:
+            raise ValidationError({"month": "Use the YYYY-MM format."}) from error
+        window_start = selected_month
+        window_end = selected_month.replace(
+            day=calendar.monthrange(selected_month.year, selected_month.month)[1]
+        )
+        leaves = (
+            Leave.objects.filter(
+                Q(employee__user__department_assignments__department_id__in=department_ids)
+                | Q(employee__user__departments__id__in=department_ids),
+                status=Leave.Status.APPROVED,
+                start_date__lte=window_end,
+                end_date__gte=window_start,
+            )
+            .select_related("employee__user")
+            .order_by("start_date", "employee__user__first_name")
+            .distinct()
+            if department_ids
+            else Leave.objects.none()
+        )
+        return Response(
+            {
+                "window_start": window_start,
+                "window_end": window_end,
+                "departments": list(departments.values("id", "name")),
+                "leave_requests": DepartmentLeaveSerializer(leaves, many=True).data,
+            }
         )

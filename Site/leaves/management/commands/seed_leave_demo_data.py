@@ -42,9 +42,7 @@ class Command(BaseCommand):
         if not employees:
             raise CommandError("No employees exist. Import users before seeding leave data.")
 
-        ceo = next(
-            (employee for employee in employees if employee.job_title.lower() == "ceo"), None
-        )
+        ceo = next((employee for employee in employees if employee.job_title.lower() == "ceo"), None)
         cto = next(
             (
                 employee

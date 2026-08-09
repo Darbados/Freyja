@@ -1,5 +1,5 @@
 import calendar
-from datetime import date
+import datetime
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -174,7 +174,7 @@ class DepartmentLeaveScheduleApiView(APIView):
         requested_month = request.query_params.get("month")
         try:
             selected_month = (
-                date.fromisoformat(f"{requested_month}-01")
+                datetime.date.fromisoformat(f"{requested_month}-01")
                 if requested_month
                 else timezone.localdate().replace(day=1)
             )

@@ -1,4 +1,4 @@
-from datetime import timedelta
+import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -92,7 +92,7 @@ class Leave(TimeStampMixin):
         workdays = sum(
             1
             for offset in range((self.end_date - self.start_date).days + 1)
-            if (self.start_date + timedelta(days=offset)).weekday() < 5
+            if (self.start_date + datetime.timedelta(days=offset)).weekday() < 5
         )
         if workdays == 0:
             return Decimal("0")
@@ -129,15 +129,19 @@ class Leave(TimeStampMixin):
             raise ValidationError("Use the same day portion for a single-day request.")
         if self.start_date < self.end_date:
             if self.start_day_part == self.DayPart.FIRST_HALF:
-                raise ValidationError({"start_day_part": "A multi-day request can start with a full day or second half."})
+                raise ValidationError(
+                    {
+                        "start_day_part": "A multi-day request can start with a full day or second half."
+                    }
+                )
             if self.end_day_part == self.DayPart.SECOND_HALF:
-                raise ValidationError({"end_day_part": "A multi-day request can end with a full day or first half."})
+                raise ValidationError(
+                    {"end_day_part": "A multi-day request can end with a full day or first half."}
+                )
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         self.full_clean()
         return super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return (
-            f"{self.employee} leave from {self.start_date} to {self.end_date}"
-        )
+        return f"{self.employee} leave from {self.start_date} to {self.end_date}"

@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+import datetime
 from decimal import Decimal, ROUND_CEILING
 
 from django.db.models import Q
@@ -10,8 +10,8 @@ from leaves.models import Leave
 def annual_leave_balance(employee: Employee, year: int) -> dict[str, Decimal | int]:
     """Calculates the employee's booked and remaining annual leave for one year."""
 
-    year_start = date(year, 1, 1)
-    year_end = date(year, 12, 31)
+    year_start = datetime.date(year, 1, 1)
+    year_end = datetime.date(year, 12, 31)
     employment = (
         Employment.objects.select_related("employment_type")
         .filter(employee=employee, start_date__lte=year_end)
@@ -57,7 +57,9 @@ def _round_entitlement_up(value: Decimal) -> int:
     return int(value.quantize(Decimal("1"), rounding=ROUND_CEILING))
 
 
-def _leave_days_in_period(leave: Leave, period_start: date, period_end: date) -> Decimal:
+def _leave_days_in_period(
+    leave: Leave, period_start: datetime.date, period_end: datetime.date
+) -> Decimal:
     start = max(leave.start_date, period_start)
     end = min(leave.end_date, period_end)
     if end < start:
@@ -66,7 +68,7 @@ def _leave_days_in_period(leave: Leave, period_start: date, period_end: date) ->
     workdays = sum(
         1
         for offset in range((end - start).days + 1)
-        if (start + timedelta(days=offset)).weekday() < 5
+        if (start + datetime.timedelta(days=offset)).weekday() < 5
     )
     days = Decimal(workdays)
     if days == 0:
@@ -74,7 +76,9 @@ def _leave_days_in_period(leave: Leave, period_start: date, period_end: date) ->
 
     if start == end:
         if leave.start_date == leave.end_date:
-            return Decimal("1") if leave.start_day_part == Leave.DayPart.FULL_DAY else Decimal("0.5")
+            return (
+                Decimal("1") if leave.start_day_part == Leave.DayPart.FULL_DAY else Decimal("0.5")
+            )
         if start == leave.start_date and leave.start_day_part == Leave.DayPart.SECOND_HALF:
             return Decimal("0.5")
         if end == leave.end_date and leave.end_day_part == Leave.DayPart.FIRST_HALF:

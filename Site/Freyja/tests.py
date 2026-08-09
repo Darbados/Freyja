@@ -21,7 +21,7 @@ class MailerTests(SimpleTestCase):
                 "Period: 10 Aug 2026 (Full day) – 11 Aug 2026 (Full day)\n"
                 "Duration: 2 days\n"
                 "Type: Annual\n"
-                "Comment: Family appointment"
+                "Comment: Family appointment\n"
             ),
             from_email="webmaster@localhost",
             recipient_list=["manager@example.com"],
@@ -41,7 +41,7 @@ class MailerTests(SimpleTestCase):
                 "Emma Employee canceled their leave request.\n\n"
                 "Period: 10 Aug 2026 – 11 Aug 2026\n"
                 "Duration: 2 days\n"
-                "Cancellation reason: Plans changed"
+                "Cancellation reason: Plans changed\n"
             ),
             from_email="webmaster@localhost",
             recipient_list=["manager@example.com"],
@@ -55,10 +55,17 @@ class MailerTests(SimpleTestCase):
         render_to_string.side_effect = ["Reset your password\n", "Reset instructions"]
 
         Mailer().send_forgotten_password(
-            subject_template_name="subject.txt",
-            email_template_name="message.txt",
             context={"token": "token"},
             recipient="employee@example.com",
+        )
+
+        self.assertEqual(
+            render_to_string.call_args_list[0].args[0],
+            "registration/password_reset_subject.txt",
+        )
+        self.assertEqual(
+            render_to_string.call_args_list[1].args[0],
+            "registration/password_reset_email.txt",
         )
 
         send_mail.assert_called_once_with(

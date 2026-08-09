@@ -10,17 +10,15 @@ class Mailer:
 
     def send_leave_request(self, leave: Any) -> None:
         requester_name = leave.employee.user.get_full_name() or leave.employee.user.email
-        start = f"{leave.start_date:%d %b %Y} ({leave.get_start_day_part_display()})"
-        end = f"{leave.end_date:%d %b %Y} ({leave.get_end_day_part_display()})"
-        comment = leave.comment or "No comment provided."
         self._send(
             subject=f"Leave request from {requester_name}",
-            message=(
-                f"{requester_name} submitted a leave request.\n\n"
-                f"Period: {start} – {end}\n"
-                f"Duration: {leave.duration_days} days\n"
-                f"Type: {leave.get_leave_type_display()}\n"
-                f"Comment: {comment}"
+            message=loader.render_to_string(
+                "emails/leave_request.txt",
+                {
+                    "leave": leave,
+                    "requester_name": requester_name,
+                    "comment": leave.comment or "No comment provided.",
+                },
             ),
             recipient=leave.approver.user.email,
         )
@@ -29,11 +27,9 @@ class Mailer:
         requester_name = leave.employee.user.get_full_name() or leave.employee.user.email
         self._send(
             subject=f"Leave request canceled by {requester_name}",
-            message=(
-                f"{requester_name} canceled their leave request.\n\n"
-                f"Period: {leave.start_date:%d %b %Y} – {leave.end_date:%d %b %Y}\n"
-                f"Duration: {leave.duration_days} days\n"
-                f"Cancellation reason: {leave.cancellation_reason}"
+            message=loader.render_to_string(
+                "emails/leave_cancellation.txt",
+                {"leave": leave, "requester_name": requester_name},
             ),
             recipient=leave.approver.user.email,
         )
@@ -41,26 +37,18 @@ class Mailer:
     def send_forgotten_password(
         self,
         *,
-        subject_template_name: str,
-        email_template_name: str,
         context: dict[str, Any],
         recipient: str,
         from_email: str | None = None,
-        html_email_template_name: str | None = None,
     ) -> None:
-        subject = "".join(loader.render_to_string(subject_template_name, context).splitlines())
-        message = loader.render_to_string(email_template_name, context)
-        html_message = (
-            loader.render_to_string(html_email_template_name, context)
-            if html_email_template_name
-            else None
+        subject = "".join(
+            loader.render_to_string("registration/password_reset_subject.txt", context).splitlines()
         )
         self._send(
             subject=subject,
-            message=message,
+            message=loader.render_to_string("registration/password_reset_email.txt", context),
             recipient=recipient,
             from_email=from_email,
-            html_message=html_message,
             fail_silently=True,
         )
 

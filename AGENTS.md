@@ -22,3 +22,5 @@
 - Application code must call a named `Mailer` method and must not call Django's
   email functions or classes directly.
 - Keep the direct Django email integration private to the `Mailer` class.
+- Give every public mailing method its own dedicated `.txt` or `.html` message
+  template; do not build email bodies inline in Python.

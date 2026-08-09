@@ -19,10 +19,7 @@ class EmailPasswordResetFormTests(SimpleTestCase):
         )
 
         mailer_class.return_value.send_forgotten_password.assert_called_once_with(
-            subject_template_name="registration/password_reset_subject.txt",
-            email_template_name="registration/password_reset_email.txt",
             context=context,
             recipient="employee@example.com",
             from_email="from@example.com",
-            html_email_template_name=None,
         )

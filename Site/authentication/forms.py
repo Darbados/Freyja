@@ -33,10 +33,7 @@ class EmailPasswordResetForm(PasswordResetForm):
         html_email_template_name: str | None = None,
     ) -> None:
         Mailer().send_forgotten_password(
-            subject_template_name=subject_template_name,
-            email_template_name=email_template_name,
             context=context,
             recipient=to_email,
             from_email=from_email,
-            html_email_template_name=html_email_template_name,
         )

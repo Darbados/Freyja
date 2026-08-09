@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+import datetime
 from decimal import Decimal
 
 from django.core import mail
@@ -77,7 +77,7 @@ class LeaveRequestApiTests(TestCase):
     def test_rejects_a_weekend_leave_boundary(self) -> None:
         start = timezone.localdate()
         while start.weekday() != 5:
-            start += timedelta(days=1)
+            start += datetime.timedelta(days=1)
         response = self.client.post(
             reverse("leave_requests"),
             {
@@ -159,9 +159,9 @@ class LeaveRequestApiTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_cannot_cancel_a_request_after_its_period_ended(self) -> None:
-        day = timezone.localdate() - timedelta(days=1)
+        day = timezone.localdate() - datetime.timedelta(days=1)
         while day.weekday() >= 5:
-            day -= timedelta(days=1)
+            day -= datetime.timedelta(days=1)
         leave = self._leave(self.employee, day, approver=self.manager)
 
         response = self.client.post(
@@ -185,12 +185,12 @@ class LeaveRequestApiTests(TestCase):
         Employment.objects.create(
             employee=self.employee,
             employment_type=employment_type,
-            start_date=date(year, 1, 1),
+            start_date=datetime.date(year, 1, 1),
         )
         full_day = self._next_weekday()
-        half_day = full_day + timedelta(days=1)
+        half_day = full_day + datetime.timedelta(days=1)
         if half_day.weekday() >= 5:
-            half_day += timedelta(days=7 - half_day.weekday())
+            half_day += datetime.timedelta(days=7 - half_day.weekday())
         self._leave(self.employee, full_day, approver=self.manager)
         for _ in range(6):
             self._leave(self.employee, full_day, approver=self.manager)
@@ -232,7 +232,7 @@ class LeaveRequestApiTests(TestCase):
         Employment.objects.create(
             employee=self.employee,
             employment_type=employment_type,
-            start_date=date(year, 8, 1),
+            start_date=datetime.date(year, 8, 1),
         )
 
         response = self.client.get(reverse("leave_requests"))
@@ -254,7 +254,7 @@ class LeaveRequestApiTests(TestCase):
         Employment.objects.create(
             employee=self.employee,
             employment_type=employment_type,
-            start_date=date(year, 8, 1),
+            start_date=datetime.date(year, 8, 1),
             base_leave_days_override=Decimal("12.25"),
         )
 
@@ -309,7 +309,9 @@ class LeaveRequestApiTests(TestCase):
         response = self.client.get(reverse("department_leave_schedule"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["departments"], [{"id": department.id, "name": "Technology"}])
+        self.assertEqual(
+            response.json()["departments"], [{"id": department.id, "name": "Technology"}]
+        )
         self.assertEqual(len(response.json()["leave_requests"]), 1)
         self.assertEqual(response.json()["leave_requests"][0]["id"], approved.id)
         self.assertNotEqual(response.json()["leave_requests"][0]["id"], pending.id)
@@ -320,15 +322,15 @@ class LeaveRequestApiTests(TestCase):
         DepartmentEmployee.objects.create(department=department, user=self.employee.user)
         colleague = self._employee("colleague@example.com", "Team", "Colleague")
         DepartmentEmployee.objects.create(department=department, user=colleague.user)
-        month_start = date(2026, 8, 1)
-        current = self._leave(colleague, date(2026, 8, 3), approver=self.manager)
-        current.end_date = date(2026, 8, 7)
+        month_start = datetime.date(2026, 8, 1)
+        current = self._leave(colleague, datetime.date(2026, 8, 3), approver=self.manager)
+        current.end_date = datetime.date(2026, 8, 7)
         current.status = Leave.Status.APPROVED
         current.save()
-        historical = self._leave(colleague, date(2026, 7, 31), approver=self.manager)
+        historical = self._leave(colleague, datetime.date(2026, 7, 31), approver=self.manager)
         historical.status = Leave.Status.APPROVED
         historical.save()
-        distant = self._leave(colleague, date(2026, 9, 1), approver=self.manager)
+        distant = self._leave(colleague, datetime.date(2026, 9, 1), approver=self.manager)
         distant.status = Leave.Status.APPROVED
         distant.save()
 
@@ -338,7 +340,7 @@ class LeaveRequestApiTests(TestCase):
         self.assertEqual(response.json()["window_start"], month_start.isoformat())
         self.assertEqual(
             response.json()["window_end"],
-            date(2026, 8, 31).isoformat(),
+            datetime.date(2026, 8, 31).isoformat(),
         )
         self.assertEqual(
             [leave["id"] for leave in response.json()["leave_requests"]],
@@ -352,9 +354,9 @@ class LeaveRequestApiTests(TestCase):
         self.assertEqual(response.json()["month"], "Use the YYYY-MM format.")
 
     def _next_weekday(self):
-        day = timezone.localdate() + timedelta(days=1)
+        day = timezone.localdate() + datetime.timedelta(days=1)
         while day.weekday() >= 5:
-            day += timedelta(days=1)
+            day += datetime.timedelta(days=1)
         return day
 
     def _leave(

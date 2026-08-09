@@ -1,6 +1,6 @@
 import random
 from collections import defaultdict
-from datetime import date, timedelta
+import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -42,7 +42,9 @@ class Command(BaseCommand):
         if not employees:
             raise CommandError("No employees exist. Import users before seeding leave data.")
 
-        ceo = next((employee for employee in employees if employee.job_title.lower() == "ceo"), None)
+        ceo = next(
+            (employee for employee in employees if employee.job_title.lower() == "ceo"), None
+        )
         cto = next(
             (
                 employee
@@ -98,18 +100,18 @@ class Command(BaseCommand):
         ceo: Employee,
         cto: Employee,
         generator: random.Random,
-    ) -> dict[int, date]:
+    ) -> dict[int, datetime.date]:
         today = timezone.localdate()
-        earliest = date(today.year - 8, 1, 1)
-        random_start = earliest + timedelta(days=62)
+        earliest = datetime.date(today.year - 8, 1, 1)
+        random_start = earliest + datetime.timedelta(days=62)
         available_days = (today - random_start).days
         starts = {
             ceo.id: earliest,
-            cto.id: earliest + timedelta(days=31),
+            cto.id: earliest + datetime.timedelta(days=31),
         }
         for employee in employees:
             if employee.id not in starts:
-                starts[employee.id] = random_start + timedelta(
+                starts[employee.id] = random_start + datetime.timedelta(
                     days=generator.randint(0, available_days)
                 )
         return starts
@@ -164,8 +166,8 @@ class Command(BaseCommand):
         generator: random.Random,
     ) -> int:
         year = timezone.localdate().year
-        range_start = date(year, 1, 1)
-        range_end = date(year, 12, 15)
+        range_start = datetime.date(year, 1, 1)
+        range_end = datetime.date(year, 12, 15)
         available_days = (range_end - range_start).days
         created_count = 0
 
@@ -173,9 +175,9 @@ class Command(BaseCommand):
             if employee.leave_requests.filter(comment=SAMPLE_COMMENT).exists():
                 continue
 
-            start = range_start + timedelta(days=generator.randint(0, available_days))
+            start = range_start + datetime.timedelta(days=generator.randint(0, available_days))
             while start.weekday() >= 5:
-                start += timedelta(days=1)
+                start += datetime.timedelta(days=1)
             duration = generator.randint(1, 5)
             end = self._add_workdays(start, duration - 1)
             status = generator.choices(
@@ -214,11 +216,11 @@ class Command(BaseCommand):
 
         return created_count
 
-    def _add_workdays(self, start: date, days: int) -> date:
+    def _add_workdays(self, start: datetime.date, days: int) -> datetime.date:
         result = start
         remaining = days
         while remaining:
-            result += timedelta(days=1)
+            result += datetime.timedelta(days=1)
             if result.weekday() < 5:
                 remaining -= 1
         return result

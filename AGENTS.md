@@ -15,3 +15,10 @@
 - Qualify all module members through `datetime`, for example:
   `datetime.date`, `datetime.datetime`, `datetime.time`, and
   `datetime.timedelta`.
+
+## Email delivery
+
+- Define every application email as a public method on `Freyja.mailer.Mailer`.
+- Application code must call a named `Mailer` method and must not call Django's
+  email functions or classes directly.
+- Keep the direct Django email integration private to the `Mailer` class.

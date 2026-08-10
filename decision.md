@@ -17,6 +17,10 @@ inline. Deliver text-only messages with Django's `EmailMessage`; when an HTML
 template is used, deliver it with `EmailMultiAlternatives` and retain a plain-text
 fallback. Do not use Django's `send_mail` shortcut.
 
+Each public mailing method owns the complete message definition and constructs
+the appropriate message instance itself. The private `_send` method accepts the
+completed `EmailMessage` or `EmailMultiAlternatives` and only invokes `.send()`.
+
 Keep this transport construction inside the Mailer boundary. The intended future
 transport is `django-anymail` using `AnymailMessage`, and adopting it should not
 require changes to feature callers or the public mailing methods.

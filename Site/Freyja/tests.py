@@ -26,7 +26,7 @@ class MailerTests(SimpleTestCase):
             from_email="webmaster@localhost",
             to=["manager@example.com"],
         )
-        email_message.return_value.send.assert_called_once_with(fail_silently=False)
+        email_message.return_value.send.assert_called_once_with()
 
     @patch("Freyja.mailer.EmailMessage")
     def test_sends_leave_cancellation_email(self, email_message) -> None:
@@ -45,7 +45,7 @@ class MailerTests(SimpleTestCase):
             from_email="webmaster@localhost",
             to=["manager@example.com"],
         )
-        email_message.return_value.send.assert_called_once_with(fail_silently=False)
+        email_message.return_value.send.assert_called_once_with()
 
     @patch("Freyja.mailer.EmailMessage")
     @patch("Freyja.mailer.loader.render_to_string")
@@ -72,27 +72,7 @@ class MailerTests(SimpleTestCase):
             from_email="webmaster@localhost",
             to=["employee@example.com"],
         )
-        email_message.return_value.send.assert_called_once_with(fail_silently=True)
-
-    @patch("Freyja.mailer.EmailMultiAlternatives")
-    def test_sends_html_as_an_alternative_to_plain_text(self, email_message) -> None:
-        Mailer()._send(
-            subject="Subject",
-            message="Plain-text message",
-            html_message="<p>HTML message</p>",
-            recipient="employee@example.com",
-        )
-
-        email_message.assert_called_once_with(
-            subject="Subject",
-            body="Plain-text message",
-            from_email="webmaster@localhost",
-            to=["employee@example.com"],
-        )
-        email_message.return_value.attach_alternative.assert_called_once_with(
-            "<p>HTML message</p>", "text/html"
-        )
-        email_message.return_value.send.assert_called_once_with(fail_silently=False)
+        email_message.return_value.send.assert_called_once_with()
 
     @staticmethod
     def _leave() -> SimpleNamespace:

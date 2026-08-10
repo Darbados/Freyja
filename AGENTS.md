@@ -24,6 +24,10 @@
 - Keep the direct Django email integration private to the `Mailer` class.
 - Give every public mailing method its own dedicated `.txt` or `.html` message
   template; do not build email bodies inline in Python.
+- Each public mailing method must fully construct its `EmailMessage` or
+  `EmailMultiAlternatives` instance, including templates, subject, sender, and
+  recipients. Pass the completed instance to `Mailer._send`, which should only
+  call the message's `.send()` method.
 - Keep message construction centralized so the transport can later migrate to
   `django-anymail` and `AnymailMessage` without changing feature code or public
   `Mailer` methods.

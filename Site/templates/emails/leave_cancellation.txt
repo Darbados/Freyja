@@ -1,0 +1,5 @@
+{{ requester_name }} canceled their leave request.
+
+Period: {{ leave.start_date|date:"d M Y" }} – {{ leave.end_date|date:"d M Y" }}
+Duration: {{ leave.duration_days }} days
+Cancellation reason: {{ leave.cancellation_reason }}

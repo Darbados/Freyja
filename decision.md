@@ -1,13 +1,30 @@
-# Decision: Record the original idea behind every pull request
+# Decision: Centralize application email in a Mailer class
 
 ## Original idea
 
-Every pull request should contain a `decision.md` file that captures why the
-change was proposed. This gives future reviewers a durable way to recover the
-original intent instead of inferring it only from the implementation.
+Application features should not call Django's email functions directly. Each
+email subject or use case should have a named method on a `Mailer` class, and
+callers should only instantiate that class and invoke the relevant method.
 
 ## Decision
 
-Add or update `decision.md` at the repository root in every pull request. Lead
-with the original idea and motivation, then include only enough implementation
-context to make the decision understandable later.
+Add `Freyja.mailer.Mailer` as the single boundary around Django's email API.
+Provide named methods for leave requests, leave cancellations, and forgotten
+password emails. Route Django's password-reset form hook through the Mailer as
+well, so no feature code imports or calls the underlying mail API. Each method
+owns a dedicated text or HTML template rather than constructing its email body
+inline. Deliver text-only messages with Django's `EmailMessage`; when an HTML
+template is used, deliver it with `EmailMultiAlternatives` and retain a plain-text
+fallback. Do not use Django's `send_mail` shortcut.
+
+Each public mailing method owns the complete message definition and constructs
+the appropriate message instance itself. The private `_send` method accepts the
+completed `EmailMessage` or `EmailMultiAlternatives` and only invokes `.send()`.
+Subjects are defined directly in Python and may interpolate method parameters;
+only message bodies are rendered from templates. Constructed messages use the
+local name `msg`, and domain parameters use concrete types such as
+`LeaveRequest` rather than `Any`.
+
+Keep this transport construction inside the Mailer boundary. The intended future
+transport is `django-anymail` using `AnymailMessage`, and adopting it should not
+require changes to feature callers or the public mailing methods.

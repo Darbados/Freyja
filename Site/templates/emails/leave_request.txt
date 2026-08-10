@@ -1,0 +1,6 @@
+{{ requester_name }} submitted a leave request.
+
+Period: {{ leave.start_date|date:"d M Y" }} ({{ leave.get_start_day_part_display }}) – {{ leave.end_date|date:"d M Y" }} ({{ leave.get_end_day_part_display }})
+Duration: {{ leave.duration_days }} days
+Type: {{ leave.get_leave_type_display }}
+Comment: {{ comment }}

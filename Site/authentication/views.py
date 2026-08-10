@@ -133,8 +133,6 @@ class PasswordResetApiView(APIView):
                 request=request._request,
                 use_https=request.is_secure(),
                 from_email=None,
-                email_template_name="registration/password_reset_email.txt",
-                subject_template_name="registration/password_reset_subject.txt",
             )
 
         return Response(
@@ -174,8 +172,6 @@ class PasswordResetPageView(PasswordResetView):
 
     form_class = EmailPasswordResetForm
     template_name = "registration/password_reset_form.html"
-    email_template_name = "registration/password_reset_email.txt"
-    subject_template_name = "registration/password_reset_subject.txt"
 
 
 class PasswordResetDonePageView(PasswordResetDoneView):

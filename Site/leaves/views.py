@@ -1,8 +1,6 @@
 import calendar
 import datetime
 
-from django.conf import settings
-from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -13,6 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from Freyja.mailer import Mailer
 from employment.models import Employee
 from departments.models import Department
 from leaves.balance import annual_leave_balance
@@ -58,29 +57,11 @@ class LeaveRequestListCreateApiView(APIView):
         serializer = LeaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         leave = serializer.save(employee=employee, approver=approver)
-        transaction.on_commit(lambda: self._notify_approver(leave))
+        transaction.on_commit(lambda: Mailer().send_leave_request(leave))
 
         return Response(
             LeaveSerializer(leave).data,
             status=status.HTTP_201_CREATED,
-        )
-
-    def _notify_approver(self, leave: Leave) -> None:
-        requester_name = leave.employee.user.get_full_name() or leave.employee.user.email
-        start = f"{leave.start_date:%d %b %Y} ({leave.get_start_day_part_display()})"
-        end = f"{leave.end_date:%d %b %Y} ({leave.get_end_day_part_display()})"
-        comment = leave.comment or "No comment provided."
-        send_mail(
-            subject=f"Leave request from {requester_name}",
-            message=(
-                f"{requester_name} submitted a leave request.\n\n"
-                f"Period: {start} – {end}\n"
-                f"Duration: {leave.duration_days} days\n"
-                f"Type: {leave.get_leave_type_display()}\n"
-                f"Comment: {comment}"
-            ),
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=[leave.approver.user.email],
         )
 
 
@@ -121,23 +102,9 @@ class LeaveRequestCancelApiView(APIView):
                 )
             )
             if leave.approver is not None:
-                transaction.on_commit(lambda: self._notify_approver(leave))
+                transaction.on_commit(lambda: Mailer().send_leave_cancellation(leave))
 
         return Response(LeaveSerializer(leave).data)
-
-    def _notify_approver(self, leave: Leave) -> None:
-        requester_name = leave.employee.user.get_full_name() or leave.employee.user.email
-        send_mail(
-            subject=f"Leave request canceled by {requester_name}",
-            message=(
-                f"{requester_name} canceled their leave request.\n\n"
-                f"Period: {leave.start_date:%d %b %Y} – {leave.end_date:%d %b %Y}\n"
-                f"Duration: {leave.duration_days} days\n"
-                f"Cancellation reason: {leave.cancellation_reason}"
-            ),
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=[leave.approver.user.email],
-        )
 
 
 class TeamLeaveRequestListApiView(APIView):

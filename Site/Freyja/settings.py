@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "authentication",
+    "backoffice",
     "departments",
     "employment",
     "leaves",

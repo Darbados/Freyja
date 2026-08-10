@@ -1,0 +1,58 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}{{ user_record.email }}{% endblock %}
+{% block users_nav_class %}active{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'backoffice:users_list' %}">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+    Back to users
+</a>
+
+<div class="detail-surface">
+    <header class="detail-heading">
+        <div class="user-avatar" aria-hidden="true">
+            {% if user_record.first_name %}{{ user_record.first_name|first|upper }}{% else %}{{ user_record.email|first|upper }}{% endif %}
+        </div>
+        <div>
+            <p class="eyebrow">User details</p>
+            <h1>{% if user_record.get_full_name %}{{ user_record.get_full_name }}{% else %}{{ user_record.email }}{% endif %}</h1>
+            <p>{{ user_record.email }}</p>
+        </div>
+        <div class="detail-statuses">
+            {% if user_record.is_active %}<span class="status status-confirmed">Active</span>{% else %}<span class="status status-inactive">Inactive</span>{% endif %}
+            {% if user_record.email_confirmed_at %}<span class="status status-confirmed">Email confirmed</span>{% else %}<span class="status status-pending">Email pending</span>{% endif %}
+        </div>
+    </header>
+
+    <div class="detail-grid">
+    <section class="detail-card" aria-labelledby="identity-heading">
+        <div class="card-heading">
+            <p class="card-kicker">Profile</p>
+            <h2 id="identity-heading">Identity</h2>
+        </div>
+        <dl class="detail-list">
+            <div><dt>Email</dt><dd>{{ user_record.email }}</dd></div>
+            <div><dt>First name</dt><dd>{{ user_record.first_name|default:"Not provided" }}</dd></div>
+            <div><dt>Last name</dt><dd>{{ user_record.last_name|default:"Not provided" }}</dd></div>
+            <div><dt>Username</dt><dd>{{ user_record.username }}</dd></div>
+        </dl>
+    </section>
+
+    <section class="detail-card" aria-labelledby="account-heading">
+        <div class="card-heading">
+            <p class="card-kicker">Account</p>
+            <h2 id="account-heading">Activity and access</h2>
+        </div>
+        <dl class="detail-list">
+            <div><dt>Date joined</dt><dd><time datetime="{{ user_record.date_joined|date:'c' }}">{{ user_record.date_joined|date:"M j, Y, H:i" }}</time></dd></div>
+            <div><dt>Email confirmed</dt><dd>{% if user_record.email_confirmed_at %}<time datetime="{{ user_record.email_confirmed_at|date:'c' }}">{{ user_record.email_confirmed_at|date:"M j, Y, H:i" }}</time>{% else %}<span class="muted">Not confirmed yet</span>{% endif %}</dd></div>
+            <div><dt>Last sign in</dt><dd>{% if user_record.last_login %}<time datetime="{{ user_record.last_login|date:'c' }}">{{ user_record.last_login|date:"M j, Y, H:i" }}</time>{% else %}<span class="muted">Never</span>{% endif %}</dd></div>
+            <div><dt>Updated</dt><dd><time datetime="{{ user_record.updated_at|date:'c' }}">{{ user_record.updated_at|date:"M j, Y, H:i" }}</time></dd></div>
+            <div><dt>Staff access</dt><dd>{{ user_record.is_staff|yesno:"Yes,No" }}</dd></div>
+            <div><dt>Superuser access</dt><dd>{{ user_record.is_superuser|yesno:"Yes,No" }}</dd></div>
+        </dl>
+    </section>
+    </div>
+</div>
+{% endblock %}

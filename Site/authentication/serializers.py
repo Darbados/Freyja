@@ -14,7 +14,15 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "email_confirmed_at")
+        fields = (
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "email_confirmed_at",
+            "is_staff",
+            "is_superuser",
+        )
 
 
 class EmploymentTypeSerializer(serializers.ModelSerializer):

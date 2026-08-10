@@ -2,7 +2,10 @@
 
 ## Pull request decision record
 
-- Every pull request must add or update `decision.md` at the repository root.
+- Every pull request must add a uniquely named decision record.
+- Store records in `Site/<app>/decisions/<decision-name>.md` for the app that
+  owns the decision. Store shared infrastructure decisions under
+  `Site/Freyja/decisions/`.
 - Record the original idea and motivation for the pull request before describing
   the implementation.
 - Keep the record focused on the decision being made so its intent remains clear

@@ -1,0 +1,6 @@
+Welcome to Freyja, {{ user.first_name|default:user.email }}.
+
+Confirm your email address by opening this secure link:
+{{ confirmation_url }}
+
+This link expires in 24 hours. If you did not create this account, you can ignore this email.

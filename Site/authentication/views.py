@@ -2,6 +2,8 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.core import signing
+from django.db import transaction
 from django.contrib.auth.views import (
     LoginView,
     LogoutView,
@@ -11,6 +13,8 @@ from django.contrib.auth.views import (
     PasswordResetView,
 )
 from django.utils.decorators import method_decorator
+from django.utils import timezone
+from django.urls import reverse
 from django.views.generic import RedirectView
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import permissions, status
@@ -18,7 +22,9 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from Freyja.mailer import Mailer
 from authentication.forms import EmailAuthenticationForm, EmailPasswordResetForm
+from authentication.email_confirmation import EmailConfirmationSigner
 from authentication.serializers import (
     LoginSerializer,
     PasswordResetSerializer,
@@ -106,6 +112,11 @@ class RegisterApiView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        token = EmailConfirmationSigner().create_token(user)
+        confirmation_url = request.build_absolute_uri(
+            reverse("api_auth_confirm_email", args=(token,))
+        )
+        transaction.on_commit(lambda: Mailer().send_account_confirmation(user, confirmation_url))
         login(request, user)
         request.session.set_expiry(settings.SESSION_COOKIE_AGE)
 
@@ -116,6 +127,27 @@ class RegisterApiView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class ConfirmEmailApiView(APIView):
+    """Confirms a user's email address from an expiring signed link."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request: Request, token: str, *args: Any, **kwargs: Any) -> Response:
+        try:
+            user = EmailConfirmationSigner().verify_token(token)
+        except signing.BadSignature:
+            return Response(
+                {"detail": "This confirmation link is invalid or has expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.email_confirmed_at is None:
+            user.email_confirmed_at = timezone.now()
+            user.save(update_fields=("email_confirmed_at", "updated_at"))
+
+        return Response({"detail": "Your email address has been confirmed."})
 
 
 class PasswordResetApiView(APIView):

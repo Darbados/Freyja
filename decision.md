@@ -20,6 +20,10 @@ fallback. Do not use Django's `send_mail` shortcut.
 Each public mailing method owns the complete message definition and constructs
 the appropriate message instance itself. The private `_send` method accepts the
 completed `EmailMessage` or `EmailMultiAlternatives` and only invokes `.send()`.
+Subjects are defined directly in Python and may interpolate method parameters;
+only message bodies are rendered from templates. Constructed messages use the
+local name `msg`, and domain parameters use concrete types such as
+`LeaveRequest` rather than `Any`.
 
 Keep this transport construction inside the Mailer boundary. The intended future
 transport is `django-anymail` using `AnymailMessage`, and adopting it should not

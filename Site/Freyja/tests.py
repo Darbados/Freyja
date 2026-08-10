@@ -50,7 +50,7 @@ class MailerTests(SimpleTestCase):
     @patch("Freyja.mailer.EmailMessage")
     @patch("Freyja.mailer.loader.render_to_string")
     def test_sends_forgotten_password_email(self, render_to_string, email_message) -> None:
-        render_to_string.side_effect = ["Reset your password\n", "Reset instructions"]
+        render_to_string.return_value = "Reset instructions"
 
         Mailer().send_forgotten_password(
             context={"token": "token"},
@@ -59,15 +59,11 @@ class MailerTests(SimpleTestCase):
 
         self.assertEqual(
             render_to_string.call_args_list[0].args[0],
-            "registration/password_reset_subject.txt",
-        )
-        self.assertEqual(
-            render_to_string.call_args_list[1].args[0],
             "registration/password_reset_email.txt",
         )
 
         email_message.assert_called_once_with(
-            subject="Reset your password",
+            subject="Freyja password reset",
             body="Reset instructions",
             from_email="webmaster@localhost",
             to=["employee@example.com"],

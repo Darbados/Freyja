@@ -28,6 +28,10 @@
   `EmailMultiAlternatives` instance, including templates, subject, sender, and
   recipients. Pass the completed instance to `Mailer._send`, which should only
   call the message's `.send()` method.
+- Define email subjects directly in their public mailing methods, optionally
+  interpolating method parameters; do not render subjects from templates.
+- Use a local variable named `msg` for the constructed `EmailMessage` or
+  `EmailMultiAlternatives` instance.
 - Keep message construction centralized so the transport can later migrate to
   `django-anymail` and `AnymailMessage` without changing feature code or public
   `Mailer` methods.

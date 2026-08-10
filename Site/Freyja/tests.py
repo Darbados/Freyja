@@ -70,6 +70,37 @@ class MailerTests(SimpleTestCase):
         )
         email_message.return_value.send.assert_called_once_with()
 
+    @patch("Freyja.mailer.EmailMessage")
+    @patch("Freyja.mailer.loader.render_to_string")
+    def test_sends_account_confirmation_email(self, render_to_string, email_message) -> None:
+        render_to_string.return_value = "Confirm your account"
+        user = SimpleNamespace(
+            email="employee@example.com",
+            first_name="Emma",
+        )
+
+        Mailer().send_account_confirmation(
+            user,
+            "https://example.com/api/auth/email-confirmation/signed-token",
+        )
+
+        render_to_string.assert_called_once_with(
+            "emails/account_confirmation.txt",
+            {
+                "user": user,
+                "confirmation_url": (
+                    "https://example.com/api/auth/email-confirmation/signed-token"
+                ),
+            },
+        )
+        email_message.assert_called_once_with(
+            subject="Confirm your Freyja account",
+            body="Confirm your account",
+            from_email="webmaster@localhost",
+            to=["employee@example.com"],
+        )
+        email_message.return_value.send.assert_called_once_with()
+
     @staticmethod
     def _leave() -> SimpleNamespace:
         requester = SimpleNamespace(

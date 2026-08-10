@@ -2,7 +2,9 @@
 
 ## Pull request decision record
 
-- Every pull request must add or update `decision.md` at the repository root.
+- Every pull request must add a uniquely named decision record.
+- Store app-specific records in `Site/<app>/decisions/<decision-name>.md` and
+  cross-cutting records in `decisions/<decision-name>.md` at the repository root.
 - Record the original idea and motivation for the pull request before describing
   the implementation.
 - Keep the record focused on the decision being made so its intent remains clear

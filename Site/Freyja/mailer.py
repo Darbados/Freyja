@@ -8,6 +8,7 @@ from django.template import loader
 
 if TYPE_CHECKING:
     from leaves.models import Leave as LeaveRequest
+    from users.models import FreyjaUser
 
 
 class Mailer:
@@ -62,6 +63,23 @@ class Mailer:
             body=loader.render_to_string("registration/password_reset_email.txt", context),
             from_email=from_email or getattr(settings, "DEFAULT_FROM_EMAIL", None),
             to=[recipient],
+        )
+        self._send(msg)
+
+    def send_account_confirmation(
+        self,
+        user: FreyjaUser,
+        confirmation_url: str,
+    ) -> None:
+        subject = "Confirm your Freyja account"
+        msg = EmailMessage(
+            subject=subject,
+            body=loader.render_to_string(
+                "emails/account_confirmation.txt",
+                {"user": user, "confirmation_url": confirmation_url},
+            ),
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+            to=[user.email],
         )
         self._send(msg)
 

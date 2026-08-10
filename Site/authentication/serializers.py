@@ -14,7 +14,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name")
+        fields = ("id", "email", "first_name", "last_name", "email_confirmed_at")
 
 
 class EmploymentTypeSerializer(serializers.ModelSerializer):
@@ -73,6 +73,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "departments",
             "employments",
             "is_active",
+            "email_confirmed_at",
             "date_joined",
             "last_login",
             "created_at",
@@ -86,6 +87,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "departments",
             "employments",
             "is_active",
+            "email_confirmed_at",
             "date_joined",
             "last_login",
             "created_at",

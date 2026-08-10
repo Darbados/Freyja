@@ -13,6 +13,7 @@ class FreyjaUser(TimeStampMixin, AbstractUser):
     REQUIRED_FIELDS = ["username"]
 
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
+    email_confirmed_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         verbose_name = "user"

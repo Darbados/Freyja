@@ -151,6 +151,7 @@ LOGIN_REDIRECT_URL = "/admin/"
 LOGOUT_REDIRECT_URL = "/login/"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_CONFIRMATION_TIMEOUT = 60 * 60 * 24
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

@@ -1,7 +1,7 @@
 from typing import Any
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.template import loader
 
 
@@ -62,11 +62,16 @@ class Mailer:
         html_message: str | None = None,
         fail_silently: bool = False,
     ) -> None:
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=from_email or getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=[recipient],
-            html_message=html_message,
-            fail_silently=fail_silently,
-        )
+        message_options = {
+            "subject": subject,
+            "body": message,
+            "from_email": from_email or getattr(settings, "DEFAULT_FROM_EMAIL", None),
+            "to": [recipient],
+        }
+        if html_message is None:
+            email = EmailMessage(**message_options)
+        else:
+            email = EmailMultiAlternatives(**message_options)
+            email.attach_alternative(html_message, "text/html")
+
+        email.send(fail_silently=fail_silently)

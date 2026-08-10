@@ -8,15 +8,15 @@ from Freyja.mailer import Mailer
 
 
 class MailerTests(SimpleTestCase):
-    @patch("Freyja.mailer.send_mail")
-    def test_sends_leave_request_email(self, send_mail) -> None:
+    @patch("Freyja.mailer.EmailMessage")
+    def test_sends_leave_request_email(self, email_message) -> None:
         leave = self._leave()
 
         Mailer().send_leave_request(leave)
 
-        send_mail.assert_called_once_with(
+        email_message.assert_called_once_with(
             subject="Leave request from Emma Employee",
-            message=(
+            body=(
                 "Emma Employee submitted a leave request.\n\n"
                 "Period: 10 Aug 2026 (Full day) – 11 Aug 2026 (Full day)\n"
                 "Duration: 2 days\n"
@@ -24,34 +24,32 @@ class MailerTests(SimpleTestCase):
                 "Comment: Family appointment\n"
             ),
             from_email="webmaster@localhost",
-            recipient_list=["manager@example.com"],
-            html_message=None,
-            fail_silently=False,
+            to=["manager@example.com"],
         )
+        email_message.return_value.send.assert_called_once_with(fail_silently=False)
 
-    @patch("Freyja.mailer.send_mail")
-    def test_sends_leave_cancellation_email(self, send_mail) -> None:
+    @patch("Freyja.mailer.EmailMessage")
+    def test_sends_leave_cancellation_email(self, email_message) -> None:
         leave = self._leave()
 
         Mailer().send_leave_cancellation(leave)
 
-        send_mail.assert_called_once_with(
+        email_message.assert_called_once_with(
             subject="Leave request canceled by Emma Employee",
-            message=(
+            body=(
                 "Emma Employee canceled their leave request.\n\n"
                 "Period: 10 Aug 2026 – 11 Aug 2026\n"
                 "Duration: 2 days\n"
                 "Cancellation reason: Plans changed\n"
             ),
             from_email="webmaster@localhost",
-            recipient_list=["manager@example.com"],
-            html_message=None,
-            fail_silently=False,
+            to=["manager@example.com"],
         )
+        email_message.return_value.send.assert_called_once_with(fail_silently=False)
 
-    @patch("Freyja.mailer.send_mail")
+    @patch("Freyja.mailer.EmailMessage")
     @patch("Freyja.mailer.loader.render_to_string")
-    def test_sends_forgotten_password_email(self, render_to_string, send_mail) -> None:
+    def test_sends_forgotten_password_email(self, render_to_string, email_message) -> None:
         render_to_string.side_effect = ["Reset your password\n", "Reset instructions"]
 
         Mailer().send_forgotten_password(
@@ -68,14 +66,33 @@ class MailerTests(SimpleTestCase):
             "registration/password_reset_email.txt",
         )
 
-        send_mail.assert_called_once_with(
+        email_message.assert_called_once_with(
             subject="Reset your password",
-            message="Reset instructions",
+            body="Reset instructions",
             from_email="webmaster@localhost",
-            recipient_list=["employee@example.com"],
-            html_message=None,
-            fail_silently=True,
+            to=["employee@example.com"],
         )
+        email_message.return_value.send.assert_called_once_with(fail_silently=True)
+
+    @patch("Freyja.mailer.EmailMultiAlternatives")
+    def test_sends_html_as_an_alternative_to_plain_text(self, email_message) -> None:
+        Mailer()._send(
+            subject="Subject",
+            message="Plain-text message",
+            html_message="<p>HTML message</p>",
+            recipient="employee@example.com",
+        )
+
+        email_message.assert_called_once_with(
+            subject="Subject",
+            body="Plain-text message",
+            from_email="webmaster@localhost",
+            to=["employee@example.com"],
+        )
+        email_message.return_value.attach_alternative.assert_called_once_with(
+            "<p>HTML message</p>", "text/html"
+        )
+        email_message.return_value.send.assert_called_once_with(fail_silently=False)
 
     @staticmethod
     def _leave() -> SimpleNamespace:

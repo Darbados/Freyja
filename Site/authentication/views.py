@@ -24,6 +24,7 @@ from rest_framework.views import APIView
 
 from Freyja.mailer import Mailer
 from authentication.forms import EmailAuthenticationForm, EmailPasswordResetForm
+from authentication.middleware import TWO_FACTOR_VERIFIED_KEY
 from authentication.email_confirmation import EmailConfirmationSigner
 from authentication.serializers import (
     LoginSerializer,
@@ -31,7 +32,31 @@ from authentication.serializers import (
     ProfileSerializer,
     RegisterSerializer,
     UserSerializer,
+    TotpCodeSerializer,
 )
+from authentication.totp import (
+    decrypt_secret,
+    encrypt_secret,
+    generate_secret,
+    qr_code_data_url,
+    verify_code,
+)
+
+TWO_FACTOR_CHALLENGE_KEY = "two_factor_login_challenge"
+TWO_FACTOR_SETUP_KEY = "two_factor_setup_secret"
+TWO_FACTOR_MAX_ATTEMPTS = 5
+
+
+def _reject_challenge_attempt(request: Request, detail: str) -> Response:
+    challenge = request.session.get(TWO_FACTOR_CHALLENGE_KEY)
+    if challenge is not None:
+        challenge["attempts"] = challenge.get("attempts", 0) + 1
+        request.session[TWO_FACTOR_CHALLENGE_KEY] = challenge
+        if challenge["attempts"] >= TWO_FACTOR_MAX_ATTEMPTS:
+            request.session.pop(TWO_FACTOR_CHALLENGE_KEY, None)
+            request.session.pop(TWO_FACTOR_SETUP_KEY, None)
+            detail = "Too many invalid codes. Sign in again."
+    return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -68,12 +93,88 @@ class LoginApiView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        login(request, user)
-        if not remember:
-            request.session.set_expiry(0)
-        else:
-            request.session.set_expiry(settings.SESSION_COOKIE_AGE)
+        challenge = {
+            "user_id": user.pk,
+            "remember": remember,
+            "created_at": timezone.now().timestamp(),
+            "attempts": 0,
+        }
+        request.session[TWO_FACTOR_CHALLENGE_KEY] = challenge
+        request.session.pop(TWO_FACTOR_SETUP_KEY, None)
+        if not user.two_factor_enabled:
+            secret = generate_secret()
+            request.session[TWO_FACTOR_SETUP_KEY] = secret
+            return Response(
+                {
+                    "two_factor_setup_required": True,
+                    "qr_code": qr_code_data_url(secret, user.email),
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+        return Response({"two_factor_required": True}, status=status.HTTP_202_ACCEPTED)
 
+
+class LoginTwoFactorApiView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        serializer = TotpCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        challenge = request.session.get(TWO_FACTOR_CHALLENGE_KEY)
+        if not challenge or timezone.now().timestamp() - challenge["created_at"] > 300:
+            request.session.pop(TWO_FACTOR_CHALLENGE_KEY, None)
+            request.session.pop(TWO_FACTOR_SETUP_KEY, None)
+            return Response(
+                {"detail": "Your two-factor login expired. Sign in again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from users.models import FreyjaUser
+
+        user = FreyjaUser.objects.filter(pk=challenge["user_id"], is_active=True).first()
+        if (
+            user is None
+            or not user.two_factor_enabled
+            or not verify_code(decrypt_secret(user.totp_secret), serializer.validated_data["code"])
+        ):
+            return _reject_challenge_attempt(request, "Invalid authentication code.")
+
+        remember = challenge["remember"]
+        request.session.pop(TWO_FACTOR_CHALLENGE_KEY, None)
+        login(request, user)
+        request.session[TWO_FACTOR_VERIFIED_KEY] = True
+        request.session.set_expiry(settings.SESSION_COOKIE_AGE if remember else 0)
+        return Response({"user": UserSerializer(user).data})
+
+
+class TwoFactorEnableApiView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        serializer = TotpCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        secret = request.session.get(TWO_FACTOR_SETUP_KEY)
+        challenge = request.session.get(TWO_FACTOR_CHALLENGE_KEY)
+        if (
+            secret is None
+            or challenge is None
+            or timezone.now().timestamp() - challenge["created_at"] > 300
+            or not verify_code(secret, serializer.validated_data["code"])
+        ):
+            return _reject_challenge_attempt(request, "Invalid authentication code.")
+        from users.models import FreyjaUser
+
+        user = FreyjaUser.objects.filter(pk=challenge["user_id"], is_active=True).first()
+        if user is None:
+            return Response({"detail": "Invalid two-factor setup."}, status=400)
+        user.totp_secret = encrypt_secret(secret)
+        user.two_factor_enabled = True
+        user.save(update_fields=("totp_secret", "two_factor_enabled", "updated_at"))
+        login(request, user)
+        request.session[TWO_FACTOR_VERIFIED_KEY] = True
+        request.session.set_expiry(settings.SESSION_COOKIE_AGE if challenge["remember"] else 0)
+        request.session.pop(TWO_FACTOR_SETUP_KEY, None)
+        request.session.pop(TWO_FACTOR_CHALLENGE_KEY, None)
         return Response({"user": UserSerializer(user).data})
 
 
@@ -117,13 +218,20 @@ class RegisterApiView(APIView):
             reverse("api_auth_confirm_email", args=(token,))
         )
         transaction.on_commit(lambda: Mailer().send_account_confirmation(user, confirmation_url))
-        login(request, user)
-        request.session.set_expiry(settings.SESSION_COOKIE_AGE)
+        secret = generate_secret()
+        request.session[TWO_FACTOR_CHALLENGE_KEY] = {
+            "user_id": user.pk,
+            "remember": True,
+            "created_at": timezone.now().timestamp(),
+            "attempts": 0,
+        }
+        request.session[TWO_FACTOR_SETUP_KEY] = secret
 
         return Response(
             {
-                "user": UserSerializer(user).data,
                 "organization": getattr(user, "_pending_organization_name", ""),
+                "two_factor_setup_required": True,
+                "qr_code": qr_code_data_url(secret, user.email),
             },
             status=status.HTTP_201_CREATED,
         )

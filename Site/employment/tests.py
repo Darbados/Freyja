@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
+from Freyja.test_utils import force_two_factor_login
 from employment.models import Employee
 from users.models import FreyjaUser
 
@@ -20,7 +21,7 @@ class OrganizationChartExportApiTests(TestCase):
             "grandchild@example.com", "Nested", "Report", manager=self.child
         )
         self.other_root = self._create_employee("other@example.com", "Other", "Root")
-        self.client.force_login(self.viewer.user)
+        force_two_factor_login(self.client, self.viewer.user)
 
     def test_exports_the_whole_active_organization(self) -> None:
         response = self.client.get(reverse("organization_chart_export"))
@@ -31,7 +32,16 @@ class OrganizationChartExportApiTests(TestCase):
         self.assertEqual(rows[0], ["Level", "Employee", "Job title", "Email", "Manager"])
         self.assertEqual(
             {row[3] for row in rows[1:]},
-            {employee.user.email for employee in (self.viewer, self.root, self.child, self.grandchild, self.other_root)},
+            {
+                employee.user.email
+                for employee in (
+                    self.viewer,
+                    self.root,
+                    self.child,
+                    self.grandchild,
+                    self.other_root,
+                )
+            },
         )
 
     def test_exports_only_the_selected_subtree(self) -> None:
@@ -41,11 +51,14 @@ class OrganizationChartExportApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         rows = self._rows(response.content)
-        self.assertEqual([row[3] for row in rows[1:]], [
-            self.root.user.email,
-            self.child.user.email,
-            self.grandchild.user.email,
-        ])
+        self.assertEqual(
+            [row[3] for row in rows[1:]],
+            [
+                self.root.user.email,
+                self.child.user.email,
+                self.grandchild.user.email,
+            ],
+        )
         self.assertEqual([row[0] for row in rows[1:]], ["0", "1", "2"])
 
     def test_exports_the_selected_subtree_as_xlsx(self) -> None:
@@ -61,16 +74,17 @@ class OrganizationChartExportApiTests(TestCase):
         )
         workbook = load_workbook(BytesIO(response.content), read_only=True)
         rows = list(workbook["Organization chart"].iter_rows(values_only=True))
-        self.assertEqual([row[3] for row in rows[1:]], [
-            self.root.user.email,
-            self.child.user.email,
-            self.grandchild.user.email,
-        ])
+        self.assertEqual(
+            [row[3] for row in rows[1:]],
+            [
+                self.root.user.email,
+                self.child.user.email,
+                self.grandchild.user.email,
+            ],
+        )
 
     def test_rejects_an_unknown_export_format(self) -> None:
-        response = self.client.get(
-            reverse("organization_chart_export"), {"file_format": "pdf"}
-        )
+        response = self.client.get(reverse("organization_chart_export"), {"file_format": "pdf"})
 
         self.assertEqual(response.status_code, 400)
 

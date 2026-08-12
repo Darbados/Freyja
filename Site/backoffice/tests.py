@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from Freyja.test_utils import force_two_factor_login
 from backoffice.models import UserAdministrationEvent
 from users.models import FreyjaUser
 
@@ -20,7 +21,7 @@ class UserListViewTests(TestCase):
             f"{reverse('admin:login')}?next={reverse('backoffice:users_list')}",
         )
 
-        self.client.force_login(self._create_user("employee@example.com"))
+        force_two_factor_login(self.client, self._create_user("employee@example.com"))
         response = self.client.get(reverse("backoffice:users_list"))
         self.assertRedirects(
             response,
@@ -32,7 +33,7 @@ class UserListViewTests(TestCase):
         user = self._create_user("confirmed@example.com")
         user.email_confirmed_at = confirmed_at
         user.save(update_fields=("email_confirmed_at", "updated_at"))
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.get(reverse("backoffice:users_list"))
 
@@ -50,7 +51,7 @@ class UserListViewTests(TestCase):
             )
             for number in range(51)
         )
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         first_page = self.client.get(reverse("backoffice:users_list"))
         second_page = self.client.get(reverse("backoffice:users_list"), {"page": 2})
@@ -61,7 +62,7 @@ class UserListViewTests(TestCase):
 
     def test_links_each_user_to_their_details(self) -> None:
         user = self._create_user("details@example.com")
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.get(reverse("backoffice:users_list"))
 
@@ -109,11 +110,9 @@ class UserDetailViewTests(TestCase):
         self.assertRedirects(response, f"{reverse('admin:login')}?next={url}")
 
     def test_displays_user_account_details(self) -> None:
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
-        response = self.client.get(
-            reverse("backoffice:user_detail", args=(self.user.pk,))
-        )
+        response = self.client.get(reverse("backoffice:user_detail", args=(self.user.pk,)))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Emma Employee")
@@ -123,7 +122,7 @@ class UserDetailViewTests(TestCase):
         self.assertContains(response, self.user.last_login.strftime("%b %-d, %Y, %H:%M"))
 
     def test_returns_not_found_for_an_unknown_user(self) -> None:
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.get(reverse("backoffice:user_detail", args=(999999,)))
 
@@ -142,7 +141,7 @@ class BackofficeUserApiTests(TestCase):
         detail_url = reverse("api_backoffice_user_detail", args=(self.user.pk,))
 
         anonymous_response = self.client.get(detail_url)
-        self.client.force_login(self.user)
+        force_two_factor_login(self.client, self.user)
         user_response = self.client.get(detail_url)
 
         self.assertEqual(anonymous_response.status_code, 403)
@@ -157,7 +156,7 @@ class BackofficeUserApiTests(TestCase):
             )
             for number in range(50)
         )
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         first_page = self.client.get(reverse("api_backoffice_users"))
         second_page = self.client.get(reverse("api_backoffice_users"), {"page": 2})
@@ -168,7 +167,7 @@ class BackofficeUserApiTests(TestCase):
         self.assertEqual(len(second_page.json()["results"]), 2)
 
     def test_returns_user_details(self) -> None:
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.get(reverse("api_backoffice_user_detail", args=(self.user.pk,)))
 
@@ -177,7 +176,7 @@ class BackofficeUserApiTests(TestCase):
         self.assertTrue(response.json()["is_active"])
 
     def test_deactivates_and_audits_a_user(self) -> None:
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.post(
             reverse("api_backoffice_user_deactivate", args=(self.user.pk,)),
@@ -198,7 +197,7 @@ class BackofficeUserApiTests(TestCase):
     def test_deactivation_is_idempotent(self) -> None:
         self.user.is_active = False
         self.user.save(update_fields=("is_active", "updated_at"))
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.post(
             reverse("api_backoffice_user_deactivate", args=(self.user.pk,)),
@@ -210,7 +209,7 @@ class BackofficeUserApiTests(TestCase):
         self.assertFalse(UserAdministrationEvent.objects.exists())
 
     def test_cannot_deactivate_own_account(self) -> None:
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.post(
             reverse("api_backoffice_user_deactivate", args=(self.staff_user.pk,)),
@@ -227,7 +226,7 @@ class BackofficeUserApiTests(TestCase):
             email="superuser@example.com",
             password="test-password",
         )
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.post(
             reverse("api_backoffice_user_deactivate", args=(superuser.pk,)),
@@ -244,7 +243,7 @@ class BackofficeUserApiTests(TestCase):
             email="last-superuser@example.com",
             password="test-password",
         )
-        self.client.force_login(superuser)
+        force_two_factor_login(self.client, superuser)
 
         response = self.client.post(
             reverse("api_backoffice_user_deactivate", args=(self.staff_user.pk,)),
@@ -271,7 +270,7 @@ class BackofficeUserApiTests(TestCase):
 
     @patch("backoffice.users_admin.api_views.Mailer")
     def test_sends_and_audits_confirmation_email(self, mailer_class) -> None:
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         with self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
@@ -293,7 +292,7 @@ class BackofficeUserApiTests(TestCase):
     def test_does_not_send_confirmation_to_confirmed_user(self, mailer_class) -> None:
         self.user.email_confirmed_at = timezone.now()
         self.user.save(update_fields=("email_confirmed_at", "updated_at"))
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.post(
             reverse("api_backoffice_user_send_confirmation", args=(self.user.pk,)),
@@ -308,7 +307,7 @@ class BackofficeUserApiTests(TestCase):
     def test_does_not_send_confirmation_to_inactive_user(self, mailer_class) -> None:
         self.user.is_active = False
         self.user.save(update_fields=("is_active", "updated_at"))
-        self.client.force_login(self.staff_user)
+        force_two_factor_login(self.client, self.staff_user)
 
         response = self.client.post(
             reverse("api_backoffice_user_send_confirmation", args=(self.user.pk,)),

@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from Freyja.test_utils import force_two_factor_login
 from employment.models import Employee, Employment, EmploymentType, RelationshipKind
 from departments.models import Department, DepartmentEmployee
 from leaves.models import Leave
@@ -21,7 +22,7 @@ class LeaveRequestApiTests(TestCase):
             "Employee",
             manager=self.manager,
         )
-        self.client.force_login(self.employee.user)
+        force_two_factor_login(self.client, self.employee.user)
 
     def test_creates_leave_and_emails_the_manager(self) -> None:
         start = self._next_weekday()
@@ -275,7 +276,7 @@ class LeaveRequestApiTests(TestCase):
             manager=other_manager,
         )
         self._leave(other_employee, self._next_weekday(), approver=other_manager)
-        self.client.force_login(self.manager.user)
+        force_two_factor_login(self.client, self.manager.user)
 
         response = self.client.get(reverse("team_leave_requests"))
 

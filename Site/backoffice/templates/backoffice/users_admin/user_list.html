@@ -1,0 +1,60 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Users{% endblock %}
+{% block users_nav_class %}active{% endblock %}
+
+{% block content %}
+<header class="page-heading">
+    <div>
+        <p class="eyebrow">User administration</p>
+        <h1>Users</h1>
+        <p>Review every account registered with Freyja.</p>
+    </div>
+    <div class="record-count">{{ paginator.count }} user{{ paginator.count|pluralize }}</div>
+</header>
+
+<section class="table-card" aria-labelledby="users-table-title">
+    <h2 id="users-table-title" class="sr-only">Freyja users</h2>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col">Joined</th>
+                    <th scope="col">Email confirmed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr class="linked-row">
+                        <td><a class="email user-link" href="{% url 'backoffice:user_detail' user.pk %}">{{ user.email }}</a></td>
+                        <td><time datetime="{{ user.date_joined|date:'c' }}">{{ user.date_joined|date:"M j, Y, H:i" }}</time></td>
+                        <td>
+                            {% if user.email_confirmed_at %}
+                                <span class="status status-confirmed">Confirmed</span>
+                                <time datetime="{{ user.email_confirmed_at|date:'c' }}">{{ user.email_confirmed_at|date:"M j, Y, H:i" }}</time>
+                            {% else %}
+                                <span class="status status-pending">Pending</span>
+                                <span class="muted">Not confirmed yet</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td class="empty" colspan="3">No users have joined Freyja yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+        <nav class="pagination" aria-label="User list pages">
+            <p>Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ paginator.count }}</p>
+            <div class="page-actions">
+                {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}" rel="prev">Previous</a>{% else %}<span>Previous</span>{% endif %}
+                <span class="page-number">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+                {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}" rel="next">Next</a>{% else %}<span>Next</span>{% endif %}
+            </div>
+        </nav>
+    {% endif %}
+</section>
+{% endblock %}

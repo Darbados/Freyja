@@ -14,6 +14,8 @@ class FreyjaUser(TimeStampMixin, AbstractUser):
 
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
     email_confirmed_at = models.DateTimeField(blank=True, null=True)
+    totp_secret = models.TextField(blank=True, default="")
+    two_factor_enabled = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "user"

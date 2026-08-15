@@ -14,7 +14,16 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "email", "first_name", "last_name", "email_confirmed_at")
+        fields = (
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "email_confirmed_at",
+            "is_staff",
+            "is_superuser",
+            "two_factor_enabled",
+        )
 
 
 class EmploymentTypeSerializer(serializers.ModelSerializer):
@@ -78,6 +87,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "last_login",
             "created_at",
             "updated_at",
+            "two_factor_enabled",
         )
         read_only_fields = (
             "id",
@@ -92,6 +102,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "last_login",
             "created_at",
             "updated_at",
+            "two_factor_enabled",
         )
 
     def get_avatar(self, user: Any) -> str | None:
@@ -145,6 +156,10 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(trim_whitespace=False)
     remember = serializers.BooleanField(default=False)
+
+
+class TotpCodeSerializer(serializers.Serializer):
+    code = serializers.RegexField(r"^\d{6}$", trim_whitespace=True)
 
 
 class RegisterSerializer(serializers.Serializer):

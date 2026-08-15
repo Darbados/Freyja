@@ -5,6 +5,7 @@ from authentication.views import (
     CsrfCookieView,
     HomeRedirectView,
     LoginApiView,
+    LoginTwoFactorApiView,
     LoginPageView,
     LogoutPageView,
     LogoutApiView,
@@ -15,6 +16,7 @@ from authentication.views import (
     PasswordResetPageView,
     ProfileApiView,
     RegisterApiView,
+    TwoFactorEnableApiView,
 )
 
 urlpatterns = [
@@ -31,6 +33,8 @@ urlpatterns = [
     path("reset/done", PasswordResetCompletePageView.as_view(), name="password_reset_complete"),
     path("api/auth/csrf", CsrfCookieView.as_view(), name="api_auth_csrf"),
     path("api/auth/login", LoginApiView.as_view(), name="api_auth_login"),
+    path("api/auth/login/2fa", LoginTwoFactorApiView.as_view(), name="api_auth_login_2fa"),
+    path("api/auth/2fa/enable", TwoFactorEnableApiView.as_view(), name="api_auth_2fa_enable"),
     path("api/auth/logout", LogoutApiView.as_view(), name="api_auth_logout"),
     path("api/auth/profile", ProfileApiView.as_view(), name="api_auth_profile"),
     path("api/auth/register", RegisterApiView.as_view(), name="api_auth_register"),

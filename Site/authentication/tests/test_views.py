@@ -60,7 +60,7 @@ class TwoFactorAuthenticationTests(TestCase):
         self.assertEqual(setup.status_code, 202)
         self.assertTrue(setup.json()["two_factor_setup_required"])
         self.assertTrue(setup.json()["qr_code"].startswith("data:image/png;base64,"))
-        self.assertNotIn("secret", setup.json())
+        self.assertEqual(setup.json()["secret"], secret)
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(valid.status_code, 200)
         self.assertEqual(valid.json()["user"]["id"], self.user.id)
@@ -158,6 +158,7 @@ class TwoFactorAuthenticationTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertTrue(response.json()["two_factor_setup_required"])
+        self.assertEqual(response.json()["secret"], self.client.session[TWO_FACTOR_SETUP_KEY])
         self.assertNotIn("_auth_user_id", self.client.session)
 
 

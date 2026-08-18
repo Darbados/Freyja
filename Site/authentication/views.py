@@ -108,6 +108,7 @@ class LoginApiView(APIView):
                 {
                     "two_factor_setup_required": True,
                     "qr_code": qr_code_data_url(secret, user.email),
+                    "secret": secret,
                 },
                 status=status.HTTP_202_ACCEPTED,
             )
@@ -232,6 +233,7 @@ class RegisterApiView(APIView):
                 "organization": getattr(user, "_pending_organization_name", ""),
                 "two_factor_setup_required": True,
                 "qr_code": qr_code_data_url(secret, user.email),
+                "secret": secret,
             },
             status=status.HTTP_201_CREATED,
         )

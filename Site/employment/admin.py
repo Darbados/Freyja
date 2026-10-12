@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from employment.models import Employee, Employment, EmploymentType
+from employment.models import Employee, Employer, Employment, EmploymentType
+
+
+@admin.register(Employer)
+class EmployerAdmin(admin.ModelAdmin):
+    list_display = ("legal_name", "eik", "addressee")
+    search_fields = ("legal_name", "eik")
 
 
 @admin.register(EmploymentType)

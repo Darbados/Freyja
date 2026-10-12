@@ -14,11 +14,14 @@ dependencies = [
     "djangorestframework-stubs>=3.17.1",
     "openpyxl>=3.1.5",
     "qrcode>=8.2",
+    "reportlab>=4.4,<5",
+    "holidays>=0.80,<1",
 ]
 requires-python = ">=3.14"
 
 [project.optional-dependencies]
 dev = [
+    "pypdf>=6,<7",
     "ruff==0.15.18",
 ]
 
@@ -27,6 +30,9 @@ package-dir = {"" = "Site"}
 
 [tool.setuptools.packages.find]
 where = ["Site"]
+
+[tool.setuptools.package-data]
+leaves = ["fonts/*.ttf", "fonts/LICENSE", "templates/leaves/documents/*.txt"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

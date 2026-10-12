@@ -1,4 +1,4 @@
-import datetime
+import uuid
 from decimal import Decimal
 from typing import Any
 
@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from Freyja.mixins import TimeStampMixin
 from employment.models import Employee
+from leaves.calendar import is_working_day, working_dates
 
 
 class Leave(TimeStampMixin):
@@ -74,9 +75,13 @@ class Leave(TimeStampMixin):
         on_delete=models.SET_NULL,
         related_name="reviewed_leaves",
     )
+    client_request_id = models.UUIDField(blank=True, null=True, editable=False)
 
     class Meta:
         constraints = [
+            models.UniqueConstraint(
+                fields=("employee", "client_request_id"), name="leave_employee_request_id_unique"
+            ),
             models.CheckConstraint(
                 condition=models.Q(end_date__gte=models.F("start_date")),
                 name="leave_end_date_on_or_after_start_date",
@@ -89,20 +94,16 @@ class Leave(TimeStampMixin):
         if not self.start_date or not self.end_date or self.end_date < self.start_date:
             return Decimal("0")
 
-        workdays = sum(
-            1
-            for offset in range((self.end_date - self.start_date).days + 1)
-            if (self.start_date + datetime.timedelta(days=offset)).weekday() < 5
-        )
+        workdays = len(working_dates(self.start_date, self.end_date))
         if workdays == 0:
             return Decimal("0")
         if self.start_date == self.end_date:
             return Decimal("8") if self.start_day_part == self.DayPart.FULL_DAY else Decimal("4")
 
         hours = Decimal(workdays * 8)
-        if self.start_day_part == self.DayPart.SECOND_HALF:
+        if self.start_day_part == self.DayPart.SECOND_HALF and is_working_day(self.start_date):
             hours -= Decimal("4")
-        if self.end_day_part == self.DayPart.FIRST_HALF:
+        if self.end_day_part == self.DayPart.FIRST_HALF and is_working_day(self.end_date):
             hours -= Decimal("4")
         return hours
 
@@ -119,6 +120,19 @@ class Leave(TimeStampMixin):
 
     def clean(self) -> None:
         super().clean()
+        if self.pk and hasattr(self, "document"):
+            original = type(self).objects.get(pk=self.pk)
+            protected = (
+                "employee_id",
+                "start_date",
+                "end_date",
+                "start_day_part",
+                "end_day_part",
+                "leave_type",
+                "client_request_id",
+            )
+            if any(getattr(self, field) != getattr(original, field) for field in protected):
+                raise ValidationError("Documented requests cannot be edited. Create a new request.")
         if not self.start_date or not self.end_date:
             return
         if self.end_date < self.start_date:
@@ -145,3 +159,43 @@ class Leave(TimeStampMixin):
 
     def __str__(self) -> str:
         return f"{self.employee} leave from {self.start_date} to {self.end_date}"
+
+
+class LeaveDocument(TimeStampMixin):
+    """Durable render job and immutable unsigned annual-leave PDF."""
+
+    class State(models.TextChoices):
+        PENDING = "pending", "Preparing document"
+        FAILED = "failed", "Preparation failed"
+        READY = "ready", "Unsigned document"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    leave = models.OneToOneField(Leave, on_delete=models.PROTECT, related_name="document")
+    employment = models.ForeignKey("employment.Employment", on_delete=models.PROTECT)
+    template_version = models.CharField(
+        max_length=50, default="bg-annual-request-v1", editable=False
+    )
+    snapshot = models.JSONField(editable=False)
+    state = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
+    pdf = models.BinaryField(default=bytes, editable=False)
+    sha256 = models.CharField(max_length=64, blank=True, editable=False)
+    generated_at = models.DateTimeField(blank=True, null=True, editable=False)
+    attempts = models.PositiveIntegerField(default=0, editable=False)
+
+    class Meta:
+        permissions = [("access_leave_documents", "Can access employee leave documents")]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(state="ready", generated_at__isnull=False) & ~models.Q(sha256="")
+                )
+                | (models.Q(state__in=("pending", "failed"), generated_at__isnull=True, sha256="")),
+                name="leave_document_generation_state",
+            ),
+        ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise ValidationError("Document records are updated only by the generation service.")
+        self.full_clean(exclude=("pdf",))
+        super().save(*args, **kwargs)

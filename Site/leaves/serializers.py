@@ -1,3 +1,4 @@
+import datetime
 from typing import Any
 
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -5,9 +6,23 @@ from rest_framework import serializers
 
 from authentication.serializers import UserSerializer
 from leaves.models import Leave
+from leaves.calendar import is_working_day
+
+
+def document_summary(document) -> dict:
+    return {
+        "id": str(document.pk),
+        "state": document.state,
+        "label": document.get_state_display(),
+        "template_version": document.template_version,
+        "generated_at": document.generated_at,
+        "sha256": document.sha256,
+    }
 
 
 class LeaveSerializer(serializers.ModelSerializer):
+    document = serializers.SerializerMethodField()
+    client_request_id = serializers.UUIDField(required=False, write_only=True)
     duration_hours = serializers.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -44,10 +59,28 @@ class LeaveSerializer(serializers.ModelSerializer):
             "approver",
             "created_at",
             "updated_at",
+            "document",
+            "client_request_id",
         )
         read_only_fields = ("status", "cancellation_reason", "canceled_at")
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        attrs.setdefault("leave_type", Leave.LeaveType.ANNUAL)
+        attrs.setdefault("start_day_part", Leave.DayPart.FULL_DAY)
+        attrs.setdefault("end_day_part", Leave.DayPart.FULL_DAY)
+        attrs.setdefault("comment", "")
+        start, end = attrs["start_date"], attrs["end_date"]
+        if end - start > datetime.timedelta(days=366):
+            raise serializers.ValidationError("A request may cover at most 367 calendar days.")
+        if not is_working_day(start) or not is_working_day(end):
+            raise serializers.ValidationError(
+                "Leave must start and end on a Bulgarian working day."
+            )
+        if attrs["leave_type"] == Leave.LeaveType.ANNUAL and (
+            attrs["start_day_part"] != Leave.DayPart.FULL_DAY
+            or attrs["end_day_part"] != Leave.DayPart.FULL_DAY
+        ):
+            raise serializers.ValidationError("Bulgarian annual leave must use whole working days.")
         instance = Leave(**attrs)
         try:
             instance.clean()
@@ -56,6 +89,9 @@ class LeaveSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(error.message_dict) from error
             raise serializers.ValidationError(error.messages) from error
         return attrs
+
+    def get_document(self, leave: Leave) -> dict | None:
+        return document_summary(leave.document) if hasattr(leave, "document") else None
 
     def get_approver(self, leave: Leave) -> dict[str, Any] | None:
         if leave.approver is None:

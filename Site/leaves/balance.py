@@ -5,6 +5,7 @@ from django.db.models import Q
 
 from employment.models import Employee, Employment
 from leaves.models import Leave
+from leaves.calendar import is_working_day, working_dates
 
 
 def annual_leave_balance(employee: Employee, year: int) -> dict[str, Decimal | int]:
@@ -65,11 +66,7 @@ def _leave_days_in_period(
     if end < start:
         return Decimal("0")
 
-    workdays = sum(
-        1
-        for offset in range((end - start).days + 1)
-        if (start + datetime.timedelta(days=offset)).weekday() < 5
-    )
+    workdays = len(working_dates(start, end))
     days = Decimal(workdays)
     if days == 0:
         return days
@@ -85,8 +82,16 @@ def _leave_days_in_period(
             return Decimal("0.5")
         return Decimal("1")
 
-    if start == leave.start_date and leave.start_day_part == Leave.DayPart.SECOND_HALF:
+    if (
+        start == leave.start_date
+        and is_working_day(start)
+        and leave.start_day_part == Leave.DayPart.SECOND_HALF
+    ):
         days -= Decimal("0.5")
-    if end == leave.end_date and leave.end_day_part == Leave.DayPart.FIRST_HALF:
+    if (
+        end == leave.end_date
+        and is_working_day(end)
+        and leave.end_day_part == Leave.DayPart.FIRST_HALF
+    ):
         days -= Decimal("0.5")
     return days

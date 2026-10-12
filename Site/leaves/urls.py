@@ -5,10 +5,26 @@ from leaves.views import (
     LeaveRequestCancelApiView,
     LeaveRequestListCreateApiView,
     TeamLeaveRequestListApiView,
+    LeaveDocumentApiView,
+    LeaveDocumentPdfApiView,
+    LeaveDocumentRetryApiView,
+    LeaveEstimateApiView,
 )
 
 
 urlpatterns = [
+    path("estimate", LeaveEstimateApiView.as_view(), name="leave_estimate"),
+    path("requests/<int:leave_id>/document", LeaveDocumentApiView.as_view(), name="leave_document"),
+    path(
+        "requests/<int:leave_id>/document/pdf",
+        LeaveDocumentPdfApiView.as_view(),
+        name="leave_document_pdf",
+    ),
+    path(
+        "requests/<int:leave_id>/document/retry",
+        LeaveDocumentRetryApiView.as_view(),
+        name="leave_document_retry",
+    ),
     path("requests", LeaveRequestListCreateApiView.as_view(), name="leave_requests"),
     path(
         "requests/<int:leave_id>/cancel",

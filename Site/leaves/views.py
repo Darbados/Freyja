@@ -3,6 +3,7 @@ import datetime
 
 from django.db import transaction
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -15,13 +16,15 @@ from Freyja.mailer import Mailer
 from employment.models import Employee
 from departments.models import Department
 from leaves.balance import annual_leave_balance
-from leaves.models import Leave
+from leaves.documents import create_leave_request, generate_document
+from leaves.models import Leave, LeaveDocument
 from leaves.serializers import (
     AnnualLeaveBalanceSerializer,
     DepartmentLeaveSerializer,
     LeaveCancellationSerializer,
     LeaveSerializer,
     TeamLeaveSerializer,
+    document_summary,
 )
 
 
@@ -30,7 +33,9 @@ class LeaveRequestListCreateApiView(APIView):
 
     def get(self, request: Request) -> Response:
         employee = get_object_or_404(Employee, user=request.user)
-        leaves = employee.leave_requests.select_related("approver__user")
+        leaves = employee.leave_requests.select_related("approver__user", "document").defer(
+            "document__pdf", "document__snapshot"
+        )
         balance = annual_leave_balance(employee, timezone.localdate().year)
         return Response(
             {
@@ -40,28 +45,32 @@ class LeaveRequestListCreateApiView(APIView):
         )
 
     def post(self, request: Request) -> Response:
-        employee = get_object_or_404(
-            Employee.objects.select_related(
-                "user",
-                "manager__user",
-                "leave_approver__user",
-            ),
-            user=request.user,
-        )
-        approver = employee.leave_approver or employee.manager
-        if approver is None:
-            raise ValidationError(
-                {"approver": "No manager or leave approver is assigned to your profile."}
-            )
-
+        employee = get_object_or_404(Employee, user=request.user)
         serializer = LeaveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        leave = serializer.save(employee=employee, approver=approver)
-        transaction.on_commit(lambda: Mailer().send_leave_request(leave))
+        leave, created = create_leave_request(employee.pk, serializer.validated_data)
+        # Discard any reverse-relation cache populated before the render callback.
+        leave = (
+            Leave.objects.select_related("approver__user", "document")
+            .defer("document__pdf", "document__snapshot")
+            .get(pk=leave.pk)
+        )
 
         return Response(
             LeaveSerializer(leave).data,
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class LeaveEstimateApiView(APIView):
+    """Use the same calendar and validation for the form and stored request."""
+
+    def post(self, request: Request) -> Response:
+        serializer = LeaveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        leave = Leave(**serializer.validated_data)
+        return Response(
+            {"duration_days": str(leave.duration_days), "duration_hours": str(leave.duration_hours)}
         )
 
 
@@ -74,7 +83,7 @@ class LeaveRequestCancelApiView(APIView):
 
         with transaction.atomic():
             leave = get_object_or_404(
-                Leave.objects.select_for_update().select_related(
+                Leave.objects.select_for_update(of=("self",)).select_related(
                     "employee__user",
                     "approver__user",
                 ),
@@ -115,7 +124,8 @@ class TeamLeaveRequestListApiView(APIView):
         is_manager = manager.direct_reports.exists()
         leaves = (
             Leave.objects.filter(employee__manager=manager)
-            .select_related("employee__user", "approver__user")
+            .select_related("employee__user", "approver__user", "document")
+            .defer("document__pdf", "document__snapshot")
             .order_by("-start_date", "-created_at")
             if is_manager
             else Leave.objects.none()
@@ -126,6 +136,41 @@ class TeamLeaveRequestListApiView(APIView):
                 "leave_requests": TeamLeaveSerializer(leaves, many=True).data,
             }
         )
+
+
+def accessible_document(request: Request, leave_id: int) -> LeaveDocument:
+    documents = LeaveDocument.objects.all()
+    if not request.user.has_perm("leaves.access_leave_documents"):
+        documents = documents.filter(
+            Q(leave__employee__user=request.user) | Q(leave__approver__user=request.user)
+        )
+    return get_object_or_404(documents, leave_id=leave_id)
+
+
+class LeaveDocumentApiView(APIView):
+    def get(self, request: Request, leave_id: int) -> Response:
+        return Response(document_summary(accessible_document(request, leave_id)))
+
+
+class LeaveDocumentPdfApiView(APIView):
+    def get(self, request: Request, leave_id: int) -> HttpResponse | Response:
+        document = accessible_document(request, leave_id)
+        if document.state != LeaveDocument.State.READY:
+            return Response({"detail": "The document is not ready yet."}, status=409)
+        response = HttpResponse(bytes(document.pdf), content_type="application/pdf")
+        disposition = "attachment" if request.query_params.get("download") == "1" else "inline"
+        response["Content-Disposition"] = (
+            f'{disposition}; filename="leave-request-{leave_id}-{document.pk}.pdf"'
+        )
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+class LeaveDocumentRetryApiView(APIView):
+    def post(self, request: Request, leave_id: int) -> Response:
+        document = accessible_document(request, leave_id)
+        return Response(document_summary(generate_document(document.pk)))
 
 
 class DepartmentLeaveScheduleApiView(APIView):

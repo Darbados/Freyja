@@ -3,7 +3,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
 from Freyja.mixins import TimeStampMixin
@@ -12,6 +12,21 @@ from Freyja.mixins import TimeStampMixin
 class RelationshipKind(models.TextChoices):
     EMPLOYMENT = "employment", "Employment contract"
     CIVIL = "civil", "Civil contract"
+
+
+class Employer(TimeStampMixin):
+    """Verified Bulgarian employing entity used in personnel documents."""
+
+    legal_name = models.CharField(max_length=255)
+    eik = models.CharField(
+        max_length=13,
+        unique=True,
+        validators=[RegexValidator(r"\A(?:[0-9]{9}|[0-9]{13})\Z", "Enter a 9 or 13 digit EIK.")],
+    )
+    addressee = models.CharField(max_length=255, default="Управителя")
+
+    def __str__(self) -> str:
+        return self.legal_name
 
 
 class EmploymentType(TimeStampMixin):
@@ -48,6 +63,10 @@ class Employee(TimeStampMixin):
         related_name="employee_profile",
     )
     job_title = models.CharField(max_length=255, blank=True, default="")
+    legal_name = models.CharField(
+        max_length=255, blank=True, default="", help_text="HR-verified full legal name."
+    )
+    personnel_number = models.CharField(max_length=50, blank=True, default="")
     manager = models.ForeignKey(
         "self",
         blank=True,
@@ -67,9 +86,7 @@ class Employee(TimeStampMixin):
         super().clean()
 
         if self.pk and self.leave_approver_id == self.pk:
-            raise ValidationError(
-                {"leave_approver": "An employee cannot approve their own leave."}
-            )
+            raise ValidationError({"leave_approver": "An employee cannot approve their own leave."})
 
         if not self.manager_id:
             return
@@ -107,6 +124,13 @@ class Employment(TimeStampMixin):
         EmploymentType,
         on_delete=models.PROTECT,
         related_name="employments",
+    )
+    employer = models.ForeignKey(
+        Employer, on_delete=models.PROTECT, blank=True, null=True, related_name="employments"
+    )
+    uses_bulgarian_leave_calendar = models.BooleanField(
+        default=False,
+        help_text="HR confirms Bulgarian Labour Code coverage and a Monday-Friday workweek.",
     )
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)

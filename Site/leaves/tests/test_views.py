@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from Freyja.test_utils import force_two_factor_login
-from employment.models import Employee, Employment, EmploymentType, RelationshipKind
+from employment.models import Employee, Employer, Employment, EmploymentType, RelationshipKind
 from departments.models import Department, DepartmentEmployee
 from leaves.models import Leave
 from users.models import FreyjaUser
@@ -22,6 +22,23 @@ class LeaveRequestApiTests(TestCase):
             "Employee",
             manager=self.manager,
         )
+        self.employee.legal_name = "Emma Employee"
+        self.employee.personnel_number = "EMP-1"
+        self.employee.job_title = "Engineer"
+        self.employee.save()
+        employer = Employer.objects.create(legal_name="Example", eik="123456789")
+        employment_type = EmploymentType.objects.create(
+            name="Document eligible",
+            code="document-eligible",
+            relationship_kind=RelationshipKind.EMPLOYMENT,
+        )
+        Employment.objects.create(
+            employee=self.employee,
+            employment_type=employment_type,
+            employer=employer,
+            start_date=datetime.date(2020, 1, 1),
+            uses_bulgarian_leave_calendar=True,
+        )
         force_two_factor_login(self.client, self.employee.user)
 
     def test_creates_leave_and_emails_the_manager(self) -> None:
@@ -35,7 +52,7 @@ class LeaveRequestApiTests(TestCase):
                     "end_date": start.isoformat(),
                     "start_day_part": Leave.DayPart.SECOND_HALF,
                     "end_day_part": Leave.DayPart.SECOND_HALF,
-                    "leave_type": Leave.LeaveType.ANNUAL,
+                    "leave_type": Leave.LeaveType.UNPAID,
                     "comment": "Family appointment",
                 },
                 content_type="application/json",
